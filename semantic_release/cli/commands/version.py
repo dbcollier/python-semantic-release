@@ -380,31 +380,34 @@ def version(  # noqa: C901
             except GitCommandError:  # noqa: PERF203
                 log.warning("Failed to add path (%s) to index", updated_path)
 
-    rh = ReleaseHistory.from_git_history(
-        repo=repo,
-        translator=translator,
-        commit_parser=parser,
-        exclude_commit_patterns=changelog_excluded_commit_patterns,
-    )
+    # skip this lengthy process unless it's needed
+    if update_changelog or make_vcs_release:
+        rh = ReleaseHistory.from_git_history(
+            repo=repo,
+            translator=translator,
+            commit_parser=parser,
+            exclude_commit_patterns=changelog_excluded_commit_patterns,
+        )
 
     commit_date = datetime.now()
-    try:
-        rh = rh.release(
-            new_version,
-            tagger=commit_author,
-            committer=commit_author,
-            tagged_date=commit_date,
-        )
-    except ValueError as ve:
-        ctx.fail(str(ve))
-
-    changelog_context = make_changelog_context(
-        hvcs_client=hvcs_client, release_history=rh
-    )
-    changelog_context.bind_to_environment(env)
-
-    updated_paths: list[str] = []
     if update_changelog:
+        try:
+            rh = rh.release(
+                new_version,
+                tagger=commit_author,
+                committer=commit_author,
+                tagged_date=commit_date,
+            )
+        except ValueError as ve:
+            ctx.fail(str(ve))
+
+        changelog_context = make_changelog_context(
+            hvcs_client=hvcs_client, release_history=rh
+        )
+        changelog_context.bind_to_environment(env)
+
+        updated_paths: list[str] = []
+
         if template_dir.is_dir():
             if opts.noop:
                 noop_report(
